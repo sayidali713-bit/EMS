@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email       = trim($_POST['email']);
     $party       = trim($_POST['party']);
     $election_id = intval($_POST['election_id']); // from dropdown
-    $manifesto   = trim($_POST['manifesto'] ?? '');
+
   
     $image_name  = null;
 
@@ -65,8 +65,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $user_id = $conn->insert_id;
                     
                     // Insert into candidates table
-                    $stmt = $conn->prepare("INSERT INTO candidates (user_id, full_name, email, party, manifesto, profile_image, election_id) VALUES (?, ?, ?, ?, ?, ?, ?)");
-                    $stmt->bind_param("isssssi", $user_id, $full_name, $email, $party, $manifesto, $image_name, $election_id);
+                    $stmt = $conn->prepare("INSERT INTO candidates (user_id, full_name, email, party,  profile_image, election_id) VALUES (?, ?, ?, ?, ?, ?)");
+                    $stmt->bind_param("issssi", $user_id, $full_name, $email, $party,  $image_name, $election_id);
                     $stmt->execute();
                     
                     // Commit transaction
@@ -75,7 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $success = "Candidate registered successfully! They can now login with username: $username";
                     
                     // Clear form data after successful submission
-                    $username = $password = $full_name = $email = $party = $manifesto = '';
+                    $username = $password = $full_name = $email = $party = '';
                     $election_id = 0;
                 } catch (Exception $e) {
                     // Rollback transaction on error
@@ -277,12 +277,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
               </div>
               
-              <div class="md:col-span-2">
-                <label for="manifesto" class="block text-sm font-medium text-gray-700 mb-1">Manifesto</label>
-                <textarea id="manifesto" name="manifesto" rows="4" 
-                          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="Enter candidate's manifesto or campaign promises..."></textarea>
-              </div>
+              
             </div>
           </div>
           

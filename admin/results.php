@@ -87,7 +87,7 @@ $conn->close();
 
     <!-- Main Content -->
     <main class="flex-1 p-10 overflow-auto">
-        <?php include 'navbar.php'; ?>
+       
 
         <h1 class="text-3xl font-bold mb-6 text-purple-800">Election Results</h1>
 

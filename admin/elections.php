@@ -9,7 +9,6 @@ $add_error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_election'])) {
     $title = trim($_POST['title']);
-    $description = trim($_POST['description']);
     $start_date = $_POST['start_date'];
     $end_date = $_POST['end_date'];
 
@@ -135,7 +134,7 @@ $elections = $conn->query("SELECT * FROM elections ORDER BY start_date DESC");
 
     <!-- Main Content -->
     <main class="flex-1 p-8">
-        <?php include 'navbar.php'; ?>
+       
 
         <div class="container mx-auto">
 
@@ -185,7 +184,7 @@ $elections = $conn->query("SELECT * FROM elections ORDER BY start_date DESC");
                 <table class="min-w-full">
                     <thead>
                         <tr>
-                            <th class="px-4 py-2 text-left">Title</th>
+                            <th class="px-4 py-2 text-left">Position</th>
                             <th class="px-4 py-2 text-left">Status</th>
                             <th class="px-4 py-2 text-left">Start Date</th>
                             <th class="px-4 py-2 text-left">End Date</th>
@@ -227,13 +226,10 @@ $elections = $conn->query("SELECT * FROM elections ORDER BY start_date DESC");
         <form method="POST" class="space-y-4">
             <input type="hidden" name="add_election" value="1">
             <div>
-                <label class="block text-gray-700">Title</label>
+                <label class="block text-gray-700">Position</label>
                 <input type="text" name="title" required class="w-full border p-2 rounded">
             </div>
-            <div>
-                <label class="block text-gray-700">Description</label>
-                <textarea name="description" class="w-full border p-2 rounded"></textarea>
-            </div>
+          
             <div>
                 <label class="block text-gray-700">Start Date</label>
                 <input type="date" name="start_date" required class="w-full border p-2 rounded">

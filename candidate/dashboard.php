@@ -3,226 +3,258 @@ require_once '../includes/db.php';
 require_once '../includes/auth.php';
 require_once '../includes/image_utils.php';
 require_role('candidate');
+
 $user_id = $_SESSION['user_id'];
+if (!$user_id) {
+    header("Location: login.php");
+    exit;
+}
 
-// Get candidate information
-$candidate_query = "SELECT id, full_name, profile_image, election_id FROM candidates WHERE user_id = $user_id";
-$candidate_result = $conn->query($candidate_query);
-$candidate = $candidate_result->fetch_assoc();
-$candidate_id = $candidate['id'];
-$election_id = $candidate['election_id'];
+// Get candidate information using prepared statement
+$stmt = $conn->prepare("SELECT id, full_name, profile_image, election_id, party, manifesto FROM candidates WHERE user_id = ?");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$stmt->store_result();
 
-// Fetch statistics
-$total_elections = $conn->query("SELECT COUNT(*) FROM elections")->fetch_row()[0];
-$active_elections = $conn->query("SELECT COUNT(*) FROM elections WHERE status = 'active'")->fetch_row()[0];
-$registered_candidates = $conn->query("SELECT COUNT(*) FROM candidates")->fetch_row()[0];
+if ($stmt->num_rows === 0) {
+    $_SESSION['error'] = "Candidate profile not found.";
+    header("Location: login.php");
+    exit;
+}
+
+$stmt->bind_result($candidate_id, $full_name, $profile_image, $election_id, $party, $manifesto);
+$stmt->fetch();
+$stmt->close();
 
 // Get election information
-$election_query = "SELECT title FROM elections WHERE id = $election_id";
-$election_result = $conn->query($election_query);
-$election = $election_result->fetch_assoc();
+$election = [];
+if ($election_id) {
+    $stmt = $conn->prepare("SELECT title, status, start_date, end_date FROM elections WHERE id = ?");
+    $stmt->bind_param("i", $election_id);
+    $stmt->execute();
+    $election_result = $stmt->get_result();
+    $election = $election_result->fetch_assoc();
+    $stmt->close();
+}
 
-// Get all candidates for this election with vote counts
-$candidates_query = "
-    SELECT 
-        c.id,
-        c.full_name,
-        c.party,
-        c.profile_image,
-        (SELECT COUNT(*) FROM votes WHERE candidate_id = c.id) AS vote_count
-    FROM candidates c
-    WHERE c.election_id = $election_id
-    ORDER BY vote_count DESC, c.full_name ASC
-";
-$candidates_result = $conn->query($candidates_query);
+// Get the candidate's vote count
+$vote_count = 0;
+$stmt = $conn->prepare("SELECT COUNT(*) as vote_count FROM votes WHERE candidate_id = ?");
+$stmt->bind_param("i", $candidate_id);
+$stmt->execute();
+$vote_result = $stmt->get_result()->fetch_assoc();
+$vote_count = $vote_result['vote_count'] ?? 0;
+$stmt->close();
 
 // Get total votes for this election
-$total_votes_query = "SELECT COUNT(*) FROM votes WHERE election_id = $election_id";
-$total_votes_result = $conn->query($total_votes_query);
-$total_votes = $total_votes_result->fetch_row()[0];
+$total_votes = 0;
+if ($election_id) {
+    $stmt = $conn->prepare("SELECT COUNT(*) as total_votes FROM votes WHERE election_id = ?");
+    $stmt->bind_param("i", $election_id);
+    $stmt->execute();
+    $total_votes_result = $stmt->get_result()->fetch_assoc();
+    $total_votes = $total_votes_result['total_votes'] ?? 0;
+    $stmt->close();
+}
 
+$vote_percentage = $total_votes > 0 ? round(($vote_count / $total_votes) * 100, 1) : 0;
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Candidate Dashboard | EMS</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Candidate Dashboard | EMS</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
 </head>
-<body class="bg-gray-100 font-sans">
+<body class="bg-gray-50">
+    <div class="flex min-h-screen">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-purple-800 text-white text-xl flex flex-col">
+            <div class="p-6 border-b border-purple-700 flex items-center space-x-3">
+                <?= getCandidateImageHtml(
+                    $profile_image, 
+                    $full_name, 
+                    'w-10 h-10 rounded-full object-cover'
+                ) ?>
+                <div>
+                    <div class="font-semibold"><?= htmlspecialchars($full_name) ?></div>
+                    <div class="text-xs text-purple-300">Candidate</div>
+                </div>
+            </div>
+            <nav class="flex-1 p-4 space-y-2">
+                <a href="dashboard.php" class="flex items-center py-2 px-4 rounded bg-purple-700 text-white">
+                    <i class="fas fa-tachometer-alt w-6"></i>
+                    <span class="ml-2">Dashboard</span>
+                </a>
+                <a href="active_elections.php" class="flex items-center py-2 px-4 rounded hover:bg-purple-700 text-purple-200 hover:text-white">
+                    <i class="fas fa-user-circle w-6"></i>
+                    <span class="ml-2">Active Elections</span>
+                </a>
+                <a href="profile.php" class="flex items-center py-2 px-4 rounded hover:bg-purple-700 text-purple-200 hover:text-white">
+                    <i class="fas fa-user-circle w-6"></i>
+                    <span class="ml-2">My Profile</span>
+                </a>
+                 <a href="results.php" class="flex items-center py-2 px-4 rounded bg-purple-700 text-white">
+                <i class="fas fa-chart-bar w-6"></i>
+                <span class="px-3">Results</span>
+            </a>
+               
+                <a href="logout.php" class="flex items-center py-2 px-4 rounded bg-red-600 hover:bg-red-700 text-white transition-colors">
+                    <i class="fas fa-sign-out-alt w-6"></i>
+                    <span class="px-3">Logout</span>
+                </a>
+            
+            </nav>
+            <div class="p-4 text-xs text-purple-300 border-t border-purple-700">
+                <p>Election Management System</p>
+                <p>&copy; 2023 All Rights Reserved</p>
+            </div>
+        </aside>
 
-<div class="flex min-h-screen">
-  <!-- Sidebar -->
-  <aside class="w-64 bg-purple-800 text-xl text-white flex flex-col">
-    <div class="p-6 border-b border-purple-700 flex items-center space-x-3">
-      <div class="rounded-full bg-purple-600 w-10 h-10 flex items-center justify-center">
-        <i class="fas fa-user-tie text-xl"></i>
-      </div>
-      <div>
-        <div class="text-xl font-bold">EMS Candidate</div>
-        <div class="text-xs text-purple-300"><?php echo htmlspecialchars($candidate['full_name'] ?? 'Candidate'); ?></div>
-      </div>
-    </div>
-    
-    <nav class="flex-1 p-4 space-y-1">
-      <a href="/EMS2/candidate/dashboard.php" class="flex items-center py-2 px-4 rounded bg-purple-700 text-white">
-        <i class="fas fa-tachometer-alt w-6"></i>
-        <span class="ml-2">Dashboard</span>
-      </a>
-      <a href="/EMS2/candidate/active_elections.php" class="flex items-center py-2 px-4 rounded hover:bg-purple-700 text-purple-200 hover:text-white">
-        <i class="fas fa-vote-yea w-6"></i>
-        <span class="ml-2">Active Elections</span>
-      </a>
-      <a href="/EMS2/candidate/profile.php" class="flex items-center py-2 px-4 rounded hover:bg-purple-700 text-purple-200 hover:text-white">
-        <i class="fas fa-user-circle w-6"></i>
-        <span class="ml-2">My Profile</span>
-      </a>
-      <a href="/EMS2/candidate/results.php" class="flex items-center py-2 px-4 rounded hover:bg-purple-700 text-purple-200 hover:text-white">
-        <i class="fas fa-chart-bar w-6"></i>
-        <span class="ml-2">Results</span>
-      </a>
-      
-      <div class="pt-4 mt-6 border-t border-purple-700">
-        <a href="/EMS2/candidate/logout.php" class="flex items-center py-2 px-4 rounded bg-red-600 hover:bg-red-700 text-white">
-          <i class="fas fa-sign-out-alt w-6"></i>
-          <span class="ml-2">Logout</span>
-        </a>
-      </div>
-    </nav>
-    
-    <div class="p-4 text-xs text-purple-300">
-      <p>Election Management System</p>
-      <p>© 2023 All Rights Reserved</p>
-    </div>
-  </aside>
+        <!-- Main Content -->
+        <main class="flex-1 p-8 overflow-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-2xl font-bold text-gray-800">Welcome, <?= htmlspecialchars($full_name) ?></h1>
+                <div class="text-sm text-gray-600">
+                    <?= date('l, F j, Y') ?>
+                </div>
+            </div>
 
-  <!-- Main Content -->
-  <main class="flex-1 p-8 overflow-auto">
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-2xl font-bold text-gray-800">Welcome, <?php echo htmlspecialchars($candidate['full_name']); ?>!</h1>
-      <div class="text-sm text-gray-600">
-        <?php echo date('l, F j, Y'); ?>
-      </div>
-    </div>
+            <?php if (!empty($election)): ?>
+                <!-- Candidate Profile Card -->
+                <div class="bg-white rounded-lg shadow overflow-hidden mb-8">
+                    <div class="bg-blue-50 px-6 py-4 border-b border-blue-100">
+                        <h2 class="text-lg font-semibold text-blue-800">Your Profile</h2>
+                    </div>
+                    <div class="p-6">
+                        <div class="flex flex-col md:flex-row">
+                            <div class="md:w-1/4 flex justify-center mb-4 md:mb-0">
+                                <?= getCandidateImageHtml(
+                                    $profile_image, 
+                                    $full_name, 
+                                    'w-32 h-32 rounded-full object-cover border-4 border-purple-200'
+                                ) ?>
+                            </div>
+                            <div class="md:w-3/4 md:pl-8">
+                                <h3 class="text-xl font-bold text-gray-800 mb-2"><?= htmlspecialchars($full_name) ?></h3>
+                                <?php if (!empty($party)): ?>
+                                    <p class="text-gray-600 mb-2">
+                                        <i class="fas fa-flag text-purple-500 mr-2"></i>
+                                        <?= htmlspecialchars($party) ?>
+                                    </p>
+                                <?php endif; ?>
+                                <?php if (!empty($election['title'])): ?>
+                                    <p class="text-gray-600 mb-4">
+                                        <i class="fas fa-vote-yea text-purple-500 mr-2"></i>
+                                        Running in: <?= htmlspecialchars($election['title']) ?>
+                                    </p>
+                                <?php endif; ?>
+                                <?php if (!empty($manifesto)): ?>
+                                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                                        <h4 class="font-medium text-gray-700 mb-2">Your Manifesto</h4>
+                                        <p class="text-gray-600"><?= nl2br(htmlspecialchars($manifesto)) ?></p>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-    <!-- Dashboard Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-      <div class="bg-white rounded-lg shadow p-6 border-l-4 border-purple-500">
-        <div class="flex items-center">
-          <div class="rounded-full bg-purple-100 p-3 mr-4">
-            <i class="fas fa-poll-h text-purple-500 text-xl"></i>
-          </div>
-          <div>
-            <div class="text-sm font-medium text-gray-500">Total Elections</div>
-            <div class="text-2xl font-bold text-purple-800"><?php echo $total_elections; ?></div>
-          </div>
-        </div>
-      </div>
-      
-      <div class="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
-        <div class="flex items-center">
-          <div class="rounded-full bg-green-100 p-3 mr-4">
-            <i class="fas fa-vote-yea text-green-500 text-xl"></i>
-          </div>
-          <div>
-            <div class="text-sm font-medium text-gray-500">Active Elections</div>
-            <div class="text-2xl font-bold text-green-700"><?php echo $active_elections; ?></div>
-          </div>
-        </div>
-      </div>
-      
-      <div class="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
-        <div class="flex items-center">
-          <div class="rounded-full bg-blue-100 p-3 mr-4">
-            <i class="fas fa-check-square text-blue-500 text-xl"></i>
-          </div>
-          <div>
-            <div class="text-sm font-medium text-gray-500">Total Votes in Your Election</div>
-            <div class="text-2xl font-bold text-blue-700"><?php echo $total_votes; ?></div>
-          </div>
-        </div>
-      </div>
-    </div>
+                <!-- Election Stats Card -->
+                <div class="bg-white rounded-lg shadow overflow-hidden mb-8">
+                    <div class="bg-blue-50 px-6 py-4 border-b border-blue-100">
+                        <h2 class="text-lg font-semibold text-blue-800">Your Campaign Statistics</h2>
+                    </div>
+                    <div class="p-6">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                                <div class="text-3xl font-bold text-purple-600 mb-1"><?= number_format($vote_count) ?></div>
+                                <div class="text-sm text-gray-500">Total Votes</div>
+                            </div>
+                            <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                                <div class="text-3xl font-bold text-purple-600 mb-1"><?= $vote_percentage ?>%</div>
+                                <div class="text-sm text-gray-500">Vote Share</div>
+                            </div>
+                            <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                                <div class="text-3xl font-bold text-purple-600 mb-1">
+                                    <?= !empty($election['status']) ? ucfirst(htmlspecialchars($election['status'])) : 'N/A' ?>
+                                </div>
+                                <div class="text-sm text-gray-500">Election Status</div>
+                            </div>
+                        </div>
 
-    <!-- Election Results -->
-    <div class="bg-white shadow rounded-lg overflow-hidden mb-6">
-      <div class="bg-blue-50 px-6 py-4 border-b border-blue-100 flex justify-between items-center">
-        <h2 class="text-lg font-semibold text-blue-800">Current Election Results</h2>
-        <a href="results.php" class="text-blue-600 hover:text-blue-800 text-sm">View Detailed Results</a>
-      </div>
-      <div class="p-6">
-      
-      <?php if ($candidates_result && $candidates_result->num_rows > 0): ?>
-        <div class="overflow-x-auto">
-          <table class="min-w-full bg-white">
-            <thead class="bg-gray-100">
-              <tr>
-                <th class="py-3 px-4 text-left"><i class="fas fa-trophy text-yellow-500 mr-1"></i> Rank</th>
-                <th class="py-3 px-4 text-left"><i class="fas fa-image text-gray-500 mr-1"></i> Photo</th>
-                <th class="py-3 px-4 text-left"><i class="fas fa-user-tie text-purple-500 mr-1"></i> Candidate</th>
-                <th class="py-3 px-4 text-left"><i class="fas fa-flag text-blue-500 mr-1"></i> Party</th>
-                <th class="py-3 px-4 text-center"><i class="fas fa-check-square text-green-500 mr-1"></i> Votes</th>
-                <th class="py-3 px-4 text-center"><i class="fas fa-chart-pie text-red-500 mr-1"></i> Percentage</th>
-              </tr>
-            </thead>
-            <tbody>
-              <?php 
-                $rank = 1;
-                while ($row = $candidates_result->fetch_assoc()): 
-                  $percentage = $total_votes > 0 ? round(($row['vote_count'] / $total_votes) * 100, 1) : 0;
-                  $is_current_candidate = ($row['id'] == $candidate_id);
-                  $row_class = $is_current_candidate ? 'bg-green-50' : '';
-              ?>
-                <tr class="<?= $row_class ?>">
-                  <td class="py-3 px-4 border-b"><?= $rank++ ?></td>
-                  <td class="py-3 px-4 border-b">
-                    <?= getCandidateImageHtml(
-                      $row['profile_image'], 
-                      $row['full_name'], 
-                      'w-10 h-10 rounded-full object-cover'
-                    ) ?>
-                  </td>
-                  <td class="py-3 px-4 border-b font-medium <?= $is_current_candidate ? 'text-green-700' : '' ?>">
-                    <?= htmlspecialchars($row['full_name']) ?>
-                    <?= $is_current_candidate ? ' (You)' : '' ?>
-                  </td>
-                  <td class="py-3 px-4 border-b"><?= htmlspecialchars($row['party'] ?: 'Independent') ?></td>
-                  <td class="py-3 px-4 border-b text-center font-bold"><?= $row['vote_count'] ?></td>
-                  <td class="py-3 px-4 border-b text-center"><?= $percentage ?>%</td>
-                </tr>
-              <?php endwhile; ?>
-            </tbody>
-          </table>
-        </div>
-      <?php else: ?>
-        <p class="text-gray-600">No candidates found for this election.</p>
-      <?php endif; ?>
-    </div>
+                        <?php if ($election['status'] === 'active'): ?>
+                            <div class="mt-6">
+                                <h4 class="text-sm font-medium text-gray-700 mb-2">Campaign Progress</h4>
+                                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                    <div class="bg-purple-600 h-2.5 rounded-full" style="width: <?= min($vote_percentage, 100) ?>%"></div>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">
+                                    You have <?= $vote_count ?> votes (<?= $vote_percentage ?>% of total votes)
+                                </p>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
 
-    <!-- Call to Action -->
-    <div class="bg-white shadow rounded-lg overflow-hidden">
-      <div class="bg-purple-50 px-6 py-4 border-b border-purple-100">
-        <h2 class="text-lg font-semibold text-purple-800"><i class="fas fa-bolt mr-2"></i>Quick Actions</h2>
-      </div>
-      <div class="p-6">
-        <p class="text-lg text-gray-700 mb-4 flex items-center">
-          <i class="fas fa-info-circle text-blue-500 mr-2"></i>
-          View more detailed results and statistics for your elections.
-        </p>
-        <div class="flex flex-wrap gap-4 mt-6">
-          <a href="results.php" class="flex items-center bg-purple-600 hover:bg-purple-700 text-white px-5 py-3 rounded-md transition shadow-sm">
-            <i class="fas fa-chart-bar mr-2"></i> View Detailed Results
-          </a>
-          <a href="profile.php" class="flex items-center bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-md transition shadow-sm">
-            <i class="fas fa-user-edit mr-2"></i> Update My Profile
-          </a>
-        </div>
-      </div>
+                <!-- Election Timeline -->
+                <?php if (!empty($election['start_date']) && !empty($election['end_date'])): ?>
+                    <div class="bg-white rounded-lg shadow overflow-hidden">
+                        <div class="bg-blue-50 px-6 py-4 border-b border-blue-100">
+                            <h2 class="text-lg font-semibold text-blue-800">Election Timeline</h2>
+                        </div>
+                        <div class="p-6">
+                            <div class="relative">
+                                <!-- Timeline -->
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="text-sm font-medium text-gray-700">
+                                        <i class="fas fa-calendar-alt text-purple-500 mr-2"></i>
+                                        Start: <?= date('M j, Y', strtotime($election['start_date'])) ?>
+                                    </div>
+                                    <div class="text-sm font-medium text-gray-700">
+                                        <i class="fas fa-calendar-check text-purple-500 mr-2"></i>
+                                        End: <?= date('M j, Y', strtotime($election['end_date'])) ?>
+                                    </div>
+                                </div>
+                                
+                                <!-- Progress bar -->
+                                <?php 
+                                $now = time();
+                                $start_date = strtotime($election['start_date']);
+                                $end_date = strtotime($election['end_date']);
+                                $total_duration = $end_date - $start_date;
+                                $elapsed = $now - $start_date;
+                                $progress = $total_duration > 0 ? min(100, max(0, ($elapsed / $total_duration) * 100)) : 0;
+                                ?>
+                                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                    <div class="bg-green-500 h-2.5 rounded-full" style="width: <?= $progress ?>%"></div>
+                                </div>
+                                <div class="flex justify-between text-xs text-gray-500 mt-1">
+                                    <span>Started</span>
+                                    <span>Ends in <?= ceil(($end_date - $now) / (60 * 60 * 24)) ?> days</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                <?php endif; ?>
+            <?php else: ?>
+                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-info-circle text-yellow-400"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm text-yellow-700">
+                                You are not currently assigned to any active election.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            <?php endif; ?>
+        </main>
     </div>
-  </main>
-</div>
-
 </body>
 </html>

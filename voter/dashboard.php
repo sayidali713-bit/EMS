@@ -76,9 +76,13 @@ $active_elections = $conn->query("SELECT * FROM elections WHERE status = 'active
         <span class="px-3">Active Elections</span>
       </a>
      
+      <a href="profile.php" class="flex items-center py-2 px-4 rounded hover:bg-purple-700 text-purple-200 hover:text-white">
+        <i class="fas fa-user-circle w-6"></i>
+        <span class="px-3">My Profile</span>
+      </a>
       <a href="/EMS2/voter/results.php" class="flex items-center py-2 px-4 rounded hover:bg-purple-700 text-purple-200 hover:text-white transition-colors">
         <i class="fas fa-chart-bar w-6"></i>
-        <span class="px-3" >Results</span>
+        <span class="px-3" >View Results</span>
       </a>
       
       <div class="pt-4 mt-6 border-t border-purple-700">

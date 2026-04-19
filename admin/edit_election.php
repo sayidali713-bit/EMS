@@ -65,26 +65,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Edit Election | EMS Admin</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
 </head>
 <body class="bg-gray-100 font-sans">
 
 <div class="flex min-h-screen">
 
   <!-- Sidebar -->
-  <aside class="w-64 bg-gray-800 text-white flex flex-col">
+  <aside class="w-64 bg-purple-800 text-xl text-white flex flex-col">
     <div class="p-6 text-2xl font-bold border-b border-gray-700">
       EMS Admin
     </div>
-    <nav class="flex-1 p-4 space-y-2">
-      <a href="dashboard.php" class="block py-2 px-4 rounded hover:bg-gray-700">Dashboard</a>
-      <a href="elections.php" class="block py-2 px-4 bg-gray-700 rounded">Elections</a>
-      <a href="candidates.php" class="block py-2 px-4 rounded hover:bg-gray-700">Candidates</a>
-      <a href="voters.php" class="block py-2 px-4 rounded hover:bg-gray-700">Voters</a>
-      <a href="results.php" class="block py-2 px-4 rounded hover:bg-gray-700">Results</a>
-      <a href="messages.php" class="block py-2 px-4 rounded hover:bg-gray-700">Messages</a>
-      <a href="settings.php" class="block py-2 px-4 rounded hover:bg-gray-700">Settings</a>
-      <a href="logout.php" class="block py-2 px-4 rounded bg-red-600 hover:bg-red-700">Logout</a>
-    </nav>
+    <nav class="flex-1 p-4 space-y-1">
+        <a href="dashboard.php" class="flex items-center py-2 px-4 rounded hover:bg-purple-700 text-purple-200 hover:text-white">
+          <i class="fas fa-tachometer-alt w-6"></i>
+          <span class="px-4">Dashboard</span>
+        </a>
+        <a href="elections.php" class="flex items-center py-2 px-4 rounded bg-purple-700 text-white">
+          <i class="fas fa-vote-yea w-6"></i>
+          <span class="px-4">Elections</span>
+        </a>
+        <a href="candidates.php" class="flex items-center py-2 px-4 rounded hover:bg-purple-700 text-purple-200 hover:text-white">
+          <i class="fas fa-user-tie w-6"></i>
+          <span class="px-4">Candidates</span>
+        </a>
+        <a href="voters.php" class="flex items-center py-2 px-4 rounded hover:bg-purple-700 text-purple-200 hover:text-white">
+          <i class="fas fa-users w-6"></i>
+          <span class="px-4">Voters</span>
+        </a>
+        <a href="results.php" class="flex items-center py-2 px-4 rounded hover:bg-purple-700 text-purple-200 hover:text-white">
+          <i class="fas fa-chart-bar w-6"></i>
+          <span class="px-4">Results</span>
+        </a>
+        <a href="messages.php" class="flex items-center py-2 px-4 rounded hover:bg-purple-700 text-purple-200 hover:text-white">
+          <i class="fas fa-envelope w-6"></i>
+          <span class="px-4">Messages</span>
+        </a>
+        <a href="settings.php" class="flex items-center py-2 px-4 rounded hover:bg-purple-700 text-purple-200 hover:text-white">
+          <i class="fas fa-cog w-6"></i>
+          <span class="px-4">Settings</span>
+        </a>
+        
+        <div class="pt-4 mt-6 border-t border-purple-700">
+          <a href="logout.php" class="flex items-center py-2 px-4 rounded bg-red-600 hover:bg-red-700 text-white">
+            <i class="fas fa-sign-out-alt w-6"></i>
+            <span class="px-4">Logout</span>
+          </a>
+        </div>
+      </nav>
   </aside>
 
   <!-- Main Content -->

@@ -3,36 +3,19 @@ require_once '../includes/db.php';
 require_once '../includes/auth.php';
 require_role('admin');
 
-// Simulate some messages for demonstration
-$messages = [
-    [
-        'id' => 1,
-        'sender' => 'John Doe',
-        'email' => 'john.doe@example.com',
-        'subject' => 'Question about Voting Process',
-        'message' => 'I would like to know more about the voting process. How can I verify my vote was counted correctly?',
-        'date' => '2023-08-01 14:30:22',
-        'status' => 'unread'
-    ],
-    [
-        'id' => 2,
-        'sender' => 'Jane Smith',
-        'email' => 'jane.smith@example.com',
-        'subject' => 'Technical Issue with Login',
-        'message' => 'I am having trouble logging into my account. It says my credentials are invalid, but I am sure they are correct.',
-        'date' => '2023-07-30 09:15:45',
-        'status' => 'read'
-    ],
-    [
-        'id' => 3,
-        'sender' => 'Robert Johnson',
-        'email' => 'robert.j@example.com',
-        'subject' => 'Candidate Registration',
-        'message' => 'I would like to register as a candidate for the upcoming election. What are the requirements and deadlines?',
-        'date' => '2023-07-28 16:45:10',
-        'status' => 'read'
-    ]
-];
+// Load real messages submitted via Contact Us
+$messages = [];
+$result = $conn->query("SELECT id, name, email, subject, message, sent_at FROM messages ORDER BY id DESC");
+if ($result) {
+    while ($row = $result->fetch_assoc()) {
+        $messages[] = $row;
+    }
+}
+// Compute unread count if a status column exists; otherwise default to 0
+$unread = 0;
+foreach ($messages as $m) {
+    if (isset($m['status']) && $m['status'] === 'unread') { $unread++; }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -138,7 +121,7 @@ $messages = [
           <div>
             <div class="text-sm font-medium text-gray-500">Unread Messages</div>
             <div class="text-2xl font-bold text-gray-800">
-              <?php echo count(array_filter($messages, function($m) { return $m['status'] === 'unread'; })); ?>
+              <?php echo (int)$unread; ?>
             </div>
           </div>
         </div>
@@ -152,7 +135,7 @@ $messages = [
           <div>
             <div class="text-sm font-medium text-gray-500">Read Messages</div>
             <div class="text-2xl font-bold text-gray-800">
-              <?php echo count(array_filter($messages, function($m) { return $m['status'] === 'read'; })); ?>
+              <?php echo (int)(count($messages) - $unread); ?>
             </div>
           </div>
         </div>
@@ -175,34 +158,40 @@ $messages = [
       <div class="divide-y divide-gray-200">
         <?php if (count($messages) > 0): ?>
           <?php foreach ($messages as $message): ?>
-            <div class="p-6 hover:bg-gray-50 transition-colors <?php echo $message['status'] === 'unread' ? 'bg-purple-50' : ''; ?>">
+            <?php $isUnread = isset($message['status']) && $message['status'] === 'unread'; ?>
+            <div class="p-6 hover:bg-gray-50 transition-colors <?php echo $isUnread ? 'bg-purple-50' : ''; ?>">
               <div class="flex items-start">
                 <div class="flex-shrink-0 mr-4">
-                  <?php if ($message['status'] === 'unread'): ?>
+                  <?php if ($isUnread): ?>
                     <div class="w-3 h-3 bg-purple-500 rounded-full"></div>
                   <?php endif; ?>
                 </div>
                 <div class="flex-1 min-w-0">
                   <div class="flex justify-between">
                     <h3 class="text-lg font-semibold text-gray-900 truncate">
-                      <?php echo htmlspecialchars($message['subject']); ?>
+                      <?php echo htmlspecialchars($message['subject'] ?? 'No subject'); ?>
                     </h3>
                     <span class="text-sm text-gray-500">
-                      <?php echo date('M j, Y g:i A', strtotime($message['date'])); ?>
+                      <?php 
+                        $created = $message['created_at'] ?? ($message['date'] ?? null);
+                        echo $created ? date('M j, Y g:i A', strtotime($created)) : '';
+                      ?>
                     </span>
                   </div>
                   <p class="mt-1 text-sm text-gray-600 truncate">
-                    From: <span class="font-medium"><?php echo htmlspecialchars($message['sender']); ?></span>
-                    <span class="text-gray-400">&lt;<?php echo htmlspecialchars($message['email']); ?>&gt;</span>
+                    From: <span class="font-medium"><?php echo htmlspecialchars($message['name'] ?? ($message['sender'] ?? 'Anonymous')); ?></span>
+                    <?php if (!empty($message['email'])): ?>
+                      <span class="text-gray-400">&lt;<?php echo htmlspecialchars($message['email']); ?>&gt;</span>
+                    <?php endif; ?>
                   </p>
                   <p class="mt-2 text-sm text-gray-600 line-clamp-2">
-                    <?php echo htmlspecialchars($message['message']); ?>
+                    <?php echo htmlspecialchars($message['message'] ?? ''); ?>
                   </p>
                   <div class="mt-3 flex space-x-2">
-                    <button class="text-sm bg-purple-100 text-purple-700 px-3 py-1 rounded-full hover:bg-purple-200">
+                    <a href="mailto:<?php echo htmlspecialchars($message['email'] ?? ''); ?>?subject=Re:%20<?php echo rawurlencode($message['subject'] ?? ''); ?>" class="text-sm bg-purple-100 text-purple-700 px-3 py-1 rounded-full hover:bg-purple-200 inline-flex items-center">
                       <i class="fas fa-reply mr-1"></i> Reply
-                    </button>
-                    <?php if ($message['status'] === 'unread'): ?>
+                    </a>
+                    <?php if ($isUnread): ?>
                       <button class="text-sm bg-gray-100 text-gray-700 px-3 py-1 rounded-full hover:bg-gray-200">
                         <i class="fas fa-envelope-open mr-1"></i> Mark as Read
                       </button>
